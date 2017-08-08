@@ -40,13 +40,13 @@ main(void)
 #define PGDLLIMPORT __declspec (dllimport)
 #else
 #define PGDLLIMPORT
-#endif   /* __CYGWIN__ */
-#endif   /* PGDLLIMPORT */
+#endif							/* __CYGWIN__ */
+#endif							/* PGDLLIMPORT */
 
 #define SQLERRMC_LEN	150
 
 #ifdef __cplusplus
-extern		"C"
+extern "C"
 {
 #endif
 
@@ -147,7 +147,7 @@ static void* fn(void* arg)
 	value = (long)arg;
 	sprintf(name, "Connection: %d", value);
 
-	{ ECPGconnect(__LINE__, 0, "regress1" , NULL, NULL , name, 0); 
+	{ ECPGconnect(__LINE__, 0, "ecpg1_regression" , NULL, NULL , name, 0); 
 #line 47 "prep.pgc"
 
 if (sqlca.sqlcode < 0) sqlprint();}
@@ -204,7 +204,7 @@ int main ()
 	pthread_t threads[THREADS];
 #endif
 
-	{ ECPGconnect(__LINE__, 0, "regress1" , NULL, NULL , NULL, 0); 
+	{ ECPGconnect(__LINE__, 0, "ecpg1_regression" , NULL, NULL , NULL, 0); 
 #line 69 "prep.pgc"
 
 if (sqlca.sqlcode < 0) sqlprint();}

@@ -4,7 +4,7 @@
  *	  Support routines for scanning Values lists
  *	  ("VALUES (...), (...), ..." in rangetable).
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -25,6 +25,7 @@
 
 #include "executor/executor.h"
 #include "executor/nodeValuesscan.h"
+#include "utils/expandeddatum.h"
 
 
 static TupleTableSlot *ValuesNext(ValuesScanState *node);
@@ -94,6 +95,7 @@ ValuesNext(ValuesScanState *node)
 		List	   *exprstatelist;
 		Datum	   *values;
 		bool	   *isnull;
+		Form_pg_attribute *att;
 		ListCell   *lc;
 		int			resind;
 
@@ -118,7 +120,7 @@ ValuesNext(ValuesScanState *node)
 		 * is a SubPlan, and there shouldn't be any (any subselects in the
 		 * VALUES list should be InitPlans).
 		 */
-		exprstatelist = (List *) ExecInitExpr((Expr *) exprlist, NULL);
+		exprstatelist = ExecInitExprList(exprlist, NULL);
 
 		/* parser should have checked all sublists are the same length */
 		Assert(list_length(exprstatelist) == slot->tts_tupleDescriptor->natts);
@@ -129,6 +131,7 @@ ValuesNext(ValuesScanState *node)
 		 */
 		values = slot->tts_values;
 		isnull = slot->tts_isnull;
+		att = slot->tts_tupleDescriptor->attrs;
 
 		resind = 0;
 		foreach(lc, exprstatelist)
@@ -137,8 +140,18 @@ ValuesNext(ValuesScanState *node)
 
 			values[resind] = ExecEvalExpr(estate,
 										  econtext,
-										  &isnull[resind],
-										  NULL);
+										  &isnull[resind]);
+
+			/*
+			 * We must force any R/W expanded datums to read-only state, in
+			 * case they are multiply referenced in the plan node's output
+			 * expressions, or in case we skip the output projection and the
+			 * output column is multiply referenced in higher plan nodes.
+			 */
+			values[resind] = MakeExpandedObjectReadOnly(values[resind],
+														isnull[resind],
+														att[resind]->attlen);
+
 			resind++;
 		}
 
@@ -172,9 +185,11 @@ ValuesRecheck(ValuesScanState *node, TupleTableSlot *slot)
  *		access method functions.
  * ----------------------------------------------------------------
  */
-TupleTableSlot *
-ExecValuesScan(ValuesScanState *node)
+static TupleTableSlot *
+ExecValuesScan(PlanState *pstate)
 {
+	ValuesScanState *node = castNode(ValuesScanState, pstate);
+
 	return ExecScan(&node->ss,
 					(ExecScanAccessMtd) ValuesNext,
 					(ExecScanRecheckMtd) ValuesRecheck);
@@ -205,6 +220,7 @@ ExecInitValuesScan(ValuesScan *node, EState *estate, int eflags)
 	scanstate = makeNode(ValuesScanState);
 	scanstate->ss.ps.plan = (Plan *) node;
 	scanstate->ss.ps.state = estate;
+	scanstate->ss.ps.ExecProcNode = ExecValuesScan;
 
 	/*
 	 * Miscellaneous initialization
@@ -229,12 +245,8 @@ ExecInitValuesScan(ValuesScan *node, EState *estate, int eflags)
 	/*
 	 * initialize child expressions
 	 */
-	scanstate->ss.ps.targetlist = (List *)
-		ExecInitExpr((Expr *) node->scan.plan.targetlist,
-					 (PlanState *) scanstate);
-	scanstate->ss.ps.qual = (List *)
-		ExecInitExpr((Expr *) node->scan.plan.qual,
-					 (PlanState *) scanstate);
+	scanstate->ss.ps.qual =
+		ExecInitQual(node->scan.plan.qual, (PlanState *) scanstate);
 
 	/*
 	 * get info about values list
@@ -257,8 +269,6 @@ ExecInitValuesScan(ValuesScan *node, EState *estate, int eflags)
 	{
 		scanstate->exprlists[i++] = (List *) lfirst(vtl);
 	}
-
-	scanstate->ss.ps.ps_TupFromTlist = false;
 
 	/*
 	 * Initialize result tuple type and projection info.

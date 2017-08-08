@@ -33,6 +33,7 @@
  */
 
 #include "postgres.h"
+#include "miscadmin.h"
 
 #include "px-crypt.h"
 #include "px.h"
@@ -670,6 +671,8 @@ _crypt_blowfish_rn(const char *key, const char *setting,
 
 	do
 	{
+		CHECK_FOR_INTERRUPTS();
+
 		data.ctx.P[0] ^= data.expanded_key[0];
 		data.ctx.P[1] ^= data.expanded_key[1];
 		data.ctx.P[2] ^= data.expanded_key[2];
@@ -734,7 +737,7 @@ _crypt_blowfish_rn(const char *key, const char *setting,
 
 	memcpy(output, setting, 7 + 22 - 1);
 	output[7 + 22 - 1] = BF_itoa64[(int)
-						 BF_atoi64[(int) setting[7 + 22 - 1] - 0x20] & 0x30];
+								   BF_atoi64[(int) setting[7 + 22 - 1] - 0x20] & 0x30];
 
 /* This has to be bug-compatible with the original implementation, so
  * only encode 23 of the 24 bytes. :-) */

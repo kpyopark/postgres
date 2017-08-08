@@ -3,7 +3,7 @@
  * pg_shseclabel.h
  *	  definition of the system "security label" relation (pg_shseclabel)
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * -------------------------------------------------------------------------
@@ -18,18 +18,21 @@
  *		typedef struct FormData_pg_shseclabel
  * ----------------
  */
-#define SharedSecLabelRelationId		3592
+#define SharedSecLabelRelationId			3592
+#define SharedSecLabelRelation_Rowtype_Id	4066
 
-CATALOG(pg_shseclabel,3592) BKI_SHARED_RELATION BKI_WITHOUT_OIDS
+CATALOG(pg_shseclabel,3592) BKI_SHARED_RELATION BKI_ROWTYPE_OID(4066) BKI_WITHOUT_OIDS BKI_SCHEMA_MACRO
 {
 	Oid			objoid;			/* OID of the shared object itself */
 	Oid			classoid;		/* OID of table containing the shared object */
 
 #ifdef CATALOG_VARLEN			/* variable-length fields start here */
-	text provider BKI_FORCE_NOT_NULL;	/* name of label provider */
-	text label	BKI_FORCE_NOT_NULL;		/* security label of the object */
+	text		provider BKI_FORCE_NOT_NULL;	/* name of label provider */
+	text		label BKI_FORCE_NOT_NULL;	/* security label of the object */
 #endif
 } FormData_pg_shseclabel;
+
+typedef FormData_pg_shseclabel * Form_pg_shseclabel;
 
 /* ----------------
  *		compiler constants for pg_shseclabel
@@ -41,4 +44,4 @@ CATALOG(pg_shseclabel,3592) BKI_SHARED_RELATION BKI_WITHOUT_OIDS
 #define Anum_pg_shseclabel_provider		3
 #define Anum_pg_shseclabel_label		4
 
-#endif   /* PG_SHSECLABEL_H */
+#endif							/* PG_SHSECLABEL_H */
